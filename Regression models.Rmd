@@ -3,45 +3,103 @@ title: "Arbeidskrav 3: Regression models"
 author: "Johannes Urdahl Haugen"
 date: "10/23/2020"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
-```{r load packages, message=FALSE, warning=FALSE, include=FALSE}
-library(tidyverse)
+```{r load packages and data, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse) # Laster inn de ulike pakkene som blir brukt i prosjektet
 library(readr)
 library(rstatix)
-library(kableExtra)
+library(flextable)
 
-```
-
-
-```{r prepare data, message=FALSE, warning=FALSE, include=FALSE}
 download.file(url = "https://ndownloader.figstatic.com/files/14702420", 
               destfile = "./data/hypertrophy.csv") # Laster ned datafilen.
 
 hypertrophy <- read_csv("./data/hypertrophy.csv")  # Laster inn datafilen og kobler den til objektet hypertrophy.
 
-```
-
-
-```{r Part 1}
 hypertrophy %>%
   select(SUB_ID, CLUSTER, AVG_CSA_T1) %>% # Velger hvilke variabler vi vil ha med
   filter(!is.na(CLUSTER)) %>% # Filtrer vekk forsøkspersoner uten CLUSTER
   group_by(CLUSTER) # Grupper etter variabelen CLUSTER
 
-  
+```
 
+### Introduksjon
+Haun et al. (2019) samlet inn data fra 30 menn i høyskolealder for å se på effekten av styrketrening med høy motstand. Intervensjonen varte i 6 uker og så på hvordan ulike fysiologiske parametre endret seg. De 20 med lavest og høyest respons ble delt inn i to grupper, HIGH-responders og LOW-responders.
+
+I denne oppgaven skal jeg se på korrelasjon mellom ulike variabler i datasettet. Del 1 vil omhandle en sammenligning av metodene t-test og regresjonsanalyse. I del 2 skal forskjellene mellom muskelstørrelse og muskelstyrke testes ved hjelp av regresjon- og korrelasjonsanalyse. I del 3 vil jeg prøve å estimere laktatterskelen til forsøkspersonene vi testet i starten av semesteret.
+
+
+### Del 1: T-test og regresjonsanalyse
+AVG_CSA_T1 er variabelen som skal testes. Dette er gjennomsnittet av tverrsnittsarealet i lårmuskulaturen ved pre-test hos forsøkspersonene i datasettet fra Haun et al. (2019). I denne delen av rapporten vil jeg sammenligne resultatet av en t-test og en regresjonsanalyse. 
+
+I disse testene er vi ute etter om det er en forskjell i tverrsnittsarealet mellom de to gruppene. Før vi gjennomfører t-testen kan vi sette opp to hypoteser. H0-hypotesen: Det er ikke en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. H1-hypotesen: Det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. Resultatet av t-testen vises i tabellen under.
+<br>
+```{r t-test, echo=FALSE, message=FALSE, warning=FALSE}
 stat.test <- hypertrophy %>% # Lager et nytt objekt
   t_test(AVG_CSA_T1 ~ CLUSTER, var.equal = TRUE) %>% # Gjennomfører t-testen med valgte variabler med en varians som er registrert som lik.
   add_significance()
-stat.test
 
+stat.test %>%
+  select(.y., group1, group2, n1, n2, p) %>% # Velger hvilke variabler vi vil ha med.
+  flextable() %>% # Lager en tabell av resultatene.
+  set_header_labels(.y. = "Variabel", # Endrer navn på etiketter.
+                    group1 = "Gruppe 1", 
+                    group2 = "Gruppe 2",
+                    n1 = "Antall i gruppe 1",
+                    n2= "Antall i gruppe 2",
+                    p = "P-verdi") %>%
+  set_table_properties( width = 1, layout = "autofit") %>% # Gjør tabellen penere.
+  add_header_row(values = "Tabell 1: Resultater t-test", colwidths = 6) %>% # Legger til en overskrift.
+  fontsize(part = "header", size = 12) # Endrer størrelsen på overskriftene.
 
-model1 <- lm(AVG_CSA_T1 ~ CLUSTER, data = hypertrophy)
+```
+<br>
 
-tidy(model1) %>%
-  kable(col.names = c("", "Estimate", "SE", "t-statistic", "p-value"), 
-        digits = c(NA, 1, 1, 2, 3))
+T-testen ga en p-verdi på 0,013. Det vil si at det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. Får vi samme resultatet ved en regresjonsmodell? Resultatet av regresjonsmodellen er presentert i tabellen under.
+<br>
+```{r regression analysis, echo=FALSE, message=FALSE, warning=FALSE}
+model1 <- lm(AVG_CSA_T1 ~ CLUSTER, data = hypertrophy) # Lager en lineær modell med CLUSTER som predictor fra datasettet hypertrophy.
+
+tidy(model1) %>% # Gjør model1 tidy.
+  flextable() %>% # Lager en tabell med resultatet fra modellen.
+  colformat_num(digits = 3) %>% # Velger antall tall i hver variabel
+  set_header_labels(estimate = "Estimat", # Endrer navn på etikettene i tabellen
+                    std.error = "Standard Error", 
+                    statistic = "T-statistic",
+                    p.value = "P-verdi",
+                    term = "Term") %>%
+  set_table_properties( width = 1, layout = "autofit") %>% # Gjør tabellen penere.
+  add_header_row(values = "Tabell 2: Resultater regresjonsmodell", colwidths = 5) %>% # Legger til en overskrift.
+  fontsize(part = "header", size = 12) # Endrer størrelsen på overskriftene.
+
+```
+<br>
+
+Regresjonsmodellen ga en p-verdi på 0,013. Dette var akkurat samme resultatet t-testen ga oss og konklusjonen blir den samme. Det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene.
+
+<br>
+
+### Del 2: Er det en sammenheng mellom muskelstyrke og muskelstørrelse?
+
+```{r}
+hypertrophy %>%
+  ungroup()
+
+model2 <- lm(Squat_3RM_kg ~ AVG_CSA_T1 + T1_BODY_MASS, data = hypertrophy)
+
+tidy(model2) %>%
+  flextable() %>%
+  colformat_num(digits = 4) %>%
+  set_header_labels(estimate = "Estimate", # Endrer navn 
+                    std.error = "Standard Error", 
+                    statistic = "T-Statistic",
+                    p.value = "P-value",
+                    term = "Term") %>%
+  set_table_properties( width = 1, layout = "autofit") %>% # Gjør tabellen penere.
+  add_header_row(values = "Tabell 1", colwidths = 5) %>% # Legger til en overskrift.
+  fontsize(part = "header", size = 12) 
 
 ```
 
