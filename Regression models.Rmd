@@ -1,7 +1,7 @@
 ---
 title: "Arbeidskrav 3: Regression models"
 author: "Johannes Urdahl Haugen"
-date: "10/23/2020"
+date: "11/06/2020"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -12,6 +12,8 @@ library(tidyverse) # Laster inn de ulike pakkene som blir brukt i prosjektet
 library(readr)
 library(rstatix)
 library(flextable)
+library(grid)
+library(gridExtra)
 
 download.file(url = "https://ndownloader.figstatic.com/files/14702420", 
               destfile = "./data/hypertrophy.csv") # Laster ned datafilen.
@@ -36,6 +38,7 @@ AVG_CSA_T1 er variabelen som skal testes. Dette er gjennomsnittet av tverrsnitts
 
 I disse testene er vi ute etter om det er en forskjell i tverrsnittsarealet mellom de to gruppene. Før vi gjennomfører t-testen kan vi sette opp to hypoteser. H0-hypotesen: Det er ikke en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. H1-hypotesen: Det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. Resultatet av t-testen vises i tabellen under.
 <br>
+
 ```{r t-test, echo=FALSE, message=FALSE, warning=FALSE}
 stat.test <- hypertrophy %>% # Lager et nytt objekt
   t_test(AVG_CSA_T1 ~ CLUSTER, var.equal = TRUE) %>% # Gjennomfører t-testen med valgte variabler med en varians som er registrert som lik.
@@ -59,12 +62,21 @@ stat.test %>%
 
 T-testen ga en p-verdi på 0,013. Det vil si at det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. Får vi samme resultatet ved en regresjonsmodell? Resultatet av regresjonsmodellen er presentert i tabellen under.
 <br>
+
 ```{r regression analysis, echo=FALSE, message=FALSE, warning=FALSE}
 model1 <- lm(AVG_CSA_T1 ~ CLUSTER, data = hypertrophy) # Lager en lineær modell med CLUSTER som predictor fra datasettet hypertrophy.
 
 tidy(model1) %>% # Gjør model1 tidy.
+  mutate(term = factor(term, levels = c("(Intercept)",
+                                        "CLUSTERLOW"),
+                       labels = c("Intercept", 
+                                  "Cluster"))) %>%
   flextable() %>% # Lager en tabell med resultatet fra modellen.
-  colformat_num(digits = 3) %>% # Velger antall tall i hver variabel
+  colformat_num(col_keys = c("estimate", 
+                             "std.error",
+                             "statistic", 
+                             "p.value"),
+                digits = 3) %>% # Velger antall tall i hver variabel
   set_header_labels(estimate = "Estimat", # Endrer navn på etikettene i tabellen
                     std.error = "Standard Error", 
                     statistic = "T-statistic",
@@ -77,29 +89,76 @@ tidy(model1) %>% # Gjør model1 tidy.
 ```
 <br>
 
-Regresjonsmodellen ga en p-verdi på 0,013. Dette var akkurat samme resultatet t-testen ga oss og konklusjonen blir den samme. Det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene.
+Regresjonsmodellen ga en p-verdi på 0,013. Dette var akkurat samme resultatet t-testen ga oss og konklusjonen blir den samme. Det er en signifikant forskjell i tverrsnittsarealet mellom de to gruppene. Vi kan også bruke størrelsen på standard error til å si noe om forskjellen i de to gruppene. Estimatet gir oss et tall nesten tre ganger høyere enn error-verdien og underbygger at det er en signifikant forskjell i datasettet.
 
 <br>
 
 ### Del 2: Er det en sammenheng mellom muskelstyrke og muskelstørrelse?
+Fra naturens side er det naturlig å anta at det er en klar sammenheng mellom muskelstyrke og muskelstørrelse. I denne delen skal vi forsøke å finne ut om det er en sammenheng mellom muskelstyrke og muskelstørrelse ved hjelp av datasettet fra Haun et al. (2019). 
 
-```{r}
+For å se på sammenhengen lager vi en regresjonsmodell. For å vise størrelsen på muskelstyrke bruker jeg variabelen "Squat_3RM_kg" og for å vise muskelstørrelse bruker jeg variabelen "AVG_CSA_T1". I tillegg til muskelstørrelse har jeg tatt med kroppsvekt for å se om det er en forskjell mellom de to. Tabell 3 viser resultatene fra regresjonsmodellen. Figur 1 viser sammenhengen mellom muskelstyrke og tverrsnittsareal visuelt.
+<br>
+
+```{r regresjonsanalysen, message=FALSE, warning=FALSE, include=FALSE}
 hypertrophy %>%
-  ungroup()
+  ungroup() # Fjerner grupperingen av datasettet.
 
-model2 <- lm(Squat_3RM_kg ~ AVG_CSA_T1 + T1_BODY_MASS, data = hypertrophy)
+model2 <- lm(Squat_3RM_kg ~ AVG_CSA_T1 + T1_BODY_MASS, data = hypertrophy) # Lager en regresjonsmodell hvor vi tester sammenhengen i Squat_3RM_kg med både kroppsvekt og tverrsnittsareal.
+summary(model2) # Oppsummerer tallene fra modellen.
 
-tidy(model2) %>%
-  flextable() %>%
-  colformat_num(digits = 4) %>%
-  set_header_labels(estimate = "Estimate", # Endrer navn 
+tidymodel2 <- tidy(model2) # Gjør tallene fra modellen penere og lagrer det i et nytt objekt.
+
+cfmodel2 <- confint(model2) # Finner konfidensintervallene til modellen.
+
+tabell <- cbind(tidymodel2, cfmodel2) %>% # Setter sammen tidymodel2 og cfmodel2
+  mutate(term = factor(term, levels = c("(Intercept)",
+                                        "AVG_CSA_T1",
+                                        "T1_BODY_MASS"),
+                       labels = c("Intercept", 
+                                  "Tverrsnittsareal", 
+                                  "Kroppsvekt"))) %>% # Endrer navn på kolonnene under "term"
+  flextable() %>% # Binder sammen konfidensintervallene og regresjonsmodellen til en tabell
+  colformat_num(col_keys = c("estimate", 
+                             "std.error",
+                             "statistic", 
+                             "p.value",
+                             "2.5 %",
+                             "97.5 %"), 
+                digits = 3) %>% # Endrer antall desimaler på bestemte kolonner.
+  set_header_labels(estimate = "Estimat", # Endrer navn 
                     std.error = "Standard Error", 
                     statistic = "T-Statistic",
-                    p.value = "P-value",
-                    term = "Term") %>%
+                    p.value = "P-verdi",
+                    term = "Term",
+                    "2.5 %" = "CI 2.5 %",
+                    "97.5 %" = "CI 97.5 %") %>%
   set_table_properties( width = 1, layout = "autofit") %>% # Gjør tabellen penere.
-  add_header_row(values = "Tabell 1", colwidths = 5) %>% # Legger til en overskrift.
-  fontsize(part = "header", size = 12) 
+  add_header_row(values = "Tabell 3: Resultater regresjonsmodell med konfidensintervall", colwidths = 7) %>% # Legger til en overskrift.
+  fontsize(part = "header", size = 12) # Endrer størrelsen på overskriftene.
+```
 
+```{r printer tabellen, echo=FALSE, message=FALSE, warning=FALSE}
+tabell
+```
+<br>
+
+Regresjonsmodellen ga et stigningstall på 0.003. Det vil si at for hver enhet tverrsnittsarealet øker vil muskelstyrke gå opp med 0.003. Dette er et veldig lavt tall og gir ingen tydelig sammenheng mellom muskelstyrke og muskelstørrelse. Standard erroren er like stor som stigningstallet og underbygger sammen med p-verdien på 0,4 at det ikke er mulig å finne en klar sammenheng i dette datasettet. Figur 1 viser visuelt at sammenhengen mellom muskelstyrke og muskelstørrelse i dette datasettet er svak.
+
+Ser vi på kroppsvekt derimot er det mulig å finne en sammenheng. Kroppsvekten ga et stigningstall på 1.137. Det vil si at for hver kg kroppsvekt en utøver går opp vil styrken øke med 1.137 kg. Standard erroren er lav og p-verdien godt under 0.05. Figur 2 viser sammenhengen mellom kroppsvekt og muskelstyrke.
+
+```{r figur 1 og 2, echo=FALSE, fig.height=3, fig.width=8, message=FALSE, warning=FALSE}
+figur1 <- ggplot(hypertrophy, aes(AVG_CSA_T1, Squat_3RM_kg)) + 
+  geom_point() +
+  geom_smooth(method = lm, se=FALSE) +
+  labs(title="Figur 1: Muskelstyrke og muskelstørrelse",
+       x = expression(paste("Tverrsnittsareal (", mu, "m)")) , y = "Muskelstyrke (kg)")
+
+figur2 <- ggplot(hypertrophy, aes(T1_BODY_MASS, Squat_3RM_kg)) + 
+  geom_point() +
+  geom_smooth(method = lm, se=FALSE) +
+  labs(title="Figur 2: Muskelstyrke og kroppsvekt",
+       x="Kroppsvekt (kg)", y = "Muskelstyrke (kg)")
+
+grid.arrange(figur1, figur2, nrow=1)
 ```
 
