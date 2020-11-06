@@ -30,7 +30,7 @@ hypertrophy %>%
 ### Introduksjon
 Haun et al. (2019) samlet inn data fra 30 menn i høyskolealder for å se på effekten av styrketrening med høy motstand. Intervensjonen varte i 6 uker og så på hvordan ulike fysiologiske parametre endret seg. De 20 med lavest og høyest respons ble delt inn i to grupper, HIGH-responders og LOW-responders.
 
-I denne oppgaven skal jeg se på korrelasjon mellom ulike variabler i datasettet. Del 1 vil omhandle en sammenligning av metodene t-test og regresjonsanalyse. I del 2 skal forskjellene mellom muskelstørrelse og muskelstyrke testes ved hjelp av regresjon- og korrelasjonsanalyse. I del 3 vil jeg prøve å estimere laktatterskelen til forsøkspersonene vi testet i starten av semesteret.
+I denne oppgaven skal jeg se på korrelasjon mellom ulike variabler i datasettet. Del 1 vil omhandle en sammenligning av metodene t-test og regresjonsanalyse. I del 2 skal forskjellene mellom muskelstørrelse og muskelstyrke testes ved hjelp av regresjonsanalyse. I del 3 vil jeg prøve å estimere laktatterskelen til forsøkspersonene vi testet i starten av semesteret.
 
 
 ### Del 1: T-test og regresjonsanalyse
